@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cpp IDE</title>
+    <style>
+        body {
+            margin: 0;
+            background: #24242B;
+            color: aliceblue;
+        }
+
+        .icon {
+            height: 24px;
+            width: 24px;
+            color: inherit;
+        }
+
+        .run-btn {
+            background: rgba(233, 30, 99, 1);
+            border: none;
+            outline: none;
+            padding: 4px 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 3px;
+            cursor: pointer;
+            color: inherit;
+            transition: background .1s ease-in-out;
+        }
+
+        .run-btn:hover {
+            background: rgb(192, 20, 77);
+        }
+
+        .run-btn:disabled {
+            background-color: rgba(233, 30, 99, .2);
+        }
+
+        nav {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 50px;
+            padding: 0 14px;
+        }
+
+        main {
+            height: calc(100dvh - 50px);
+            display: flex;
+        }
+
+        #editor {
+            height: 100%;
+        }
+
+        #aside {
+            background-color: #282A36;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .gutter {
+            background-repeat: no-repeat;
+            background-position: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: #282A36;
+        }
+
+        main .gutter {
+            flex-direction: column;
+        }
+
+        #aside .gutter {
+            flex-direction: row;
+        }
+
+        main .gutter::after {
+            cursor: col-resize;
+            content: '';
+            display: block;
+            width: 2px;
+            flex: 1;
+            background-color: #44475A;
+        }
+
+        #aside .gutter::after {
+            cursor: row-resize;
+            content: '';
+            display: block;
+            flex: 1;
+            height: 2px;
+            background-color: #44475A;
+        }
+
+        #input {
+            display: flex;
+            flex-direction: column;
+        }
+
+        #stdin {
+            flex: 1;
+        }
+
+        .inp-name {
+            font-family: monospace;
+            padding: 5px 0;
+            text-align: center;
+            font-size: 16px;
+            color: rgba(255, 255, 255, .5);
+        }
+
+        #stdout {
+            padding: 10px;
+            font-family: monospace;
+            white-space: pre-wrap;
+            overflow-wrap: break-word;
+            word-break: break-all;
+        }
+    </style>
+
+    <!-- Include Ace CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.35.2/ace.js"
+        integrity="sha512-MhhgjhTjy8gf0TeS/nBSTJtNrXAlawcIcTfdPiNQbIdCEmvgZSARRKSlsb8+IdAMn8f+FMCVAqCjNAIkPSPUWw=="
+        crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/split.js/1.6.0/split.min.js"></script>
+</head>
+
+<body>
+    <nav>
+        <button class="run-btn" id="run" onclick="compileCode()">Run
+            <svg class="icon" focusable="false" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M8 5v14l11-7z" fill="currentColor"></path>
+            </svg>
+        </button>
+    </nav>
+    <main>
+        <div id="editor"></div>
+        <div id="aside">
+            <div id="input">
+                <div class="inp-name">stdin</div>
+                <div id="stdin"></div>
+            </div>
+            <div id="output">
+                <div class="inp-name">stdout</div>
+                <pre id="stdout"></pre>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        const runBtn = document.getElementById('run');
+        const stdoutElement = document.getElementById('stdout');
+
+        const editor = ace.edit("editor", {
+            theme: "ace/theme/dracula",
+            mode: "ace/mode/c_cpp",
+            showPrintMargin: false,
+            value: `#include <bits/stdc++.h>
+using namespace std;
+
+int main() 
+{
+    cout << "hello world";
+    return 0;
+}`,
+            wrap: 'free',
+            fontSize: 14,
+            keyboardHandler: "ace/keyboard/vscode"
+        });
+        editor.commands.addCommand({
+            name: 'myCommand',
+            bindKey: { win: 'Ctrl-R', mac: 'Command-M' },
+            exec: function (editor) {
+                document.getElementById('run').click();
+            },
+            readOnly: true
+        });
+
+        const stdin = ace.edit("stdin", {
+            theme: "ace/theme/dracula",
+            showPrintMargin: false,
+            fontSize: 14,
+            wrap: 'free'
+        });
+
+        Split(['#input', '#output'], {
+            sizes: [40, 60],
+            direction: 'vertical',
+            gutterSize: 8
+        });
+        Split(['#editor', '#aside'], {
+            sizes: [70, 30],
+            gutterSize: 8
+        });
+        function displayOutput(text, type = 'info') {
+            switch (type) {
+                case 'success':
+                    stdoutElement.style.color = '#bbb9d1';
+                    break;
+                case 'error':
+                    stdoutElement.style.color = '#d97474';
+                    break;
+                case 'info':
+                    stdoutElement.style.color = '#7171ff';
+                    break;
+                default:
+                    stdoutElement.style.color = 'inherit';
+                    break;
+            }
+
+            stdoutElement.innerText = text;
+        }
+
+        function compileCode() {
+            const formData = new URLSearchParams();
+            formData.append('code', editor.getValue().trim());
+            formData.append('language', 'cpp');
+            formData.append('input', stdin.getValue().trim());
+
+            const requestOptions = {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded'
+                },
+                body: formData
+            };
+
+            const apiUrl = 'https://api.codex.jaagrav.in';
+            runBtn.disabled = true;
+            displayOutput('compiling...', 'info');
+
+            const fetchWithTimeout = (url, options, timeout = 5000) => {
+                return Promise.race([
+                    fetch(url, options),
+                    new Promise((_, reject) =>
+                        setTimeout(() => reject(new Error('Compiling took more than expected time .\nCheck if you forgot to give input')), timeout)
+                    )
+                ]);
+            };
+
+            fetchWithTimeout(apiUrl, requestOptions)
+                .then(response => {
+                    if (!response.ok) {
+                        runBtn.disabled = false;
+                        displayOutput('Something went wrong!', 'error');
+                        throw new Error('Network response was not ok');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    runBtn.disabled = false;
+
+                    if (!data.error) {
+                        displayOutput(data.output, 'success');
+                    } else {
+                        displayOutput(data.error, 'error');
+                    }
+                })
+                .catch(error => {
+                    runBtn.disabled = false;
+                    displayOutput(error, 'error');
+                });
+        }
+
+
+    </script>
+
+</body>
+
+</html>
